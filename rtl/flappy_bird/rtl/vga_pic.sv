@@ -1,8 +1,5 @@
 
-`define FPGA
-
-`ifndef  FPGA
-  `define _INCL_DEFINITIONS
+`ifdef QUESTA
   `include "includes/bird.svh"
   `include "includes/bird_up.svh"
   `include "includes/bird_down.svh"
@@ -10,7 +7,7 @@
   `include "includes/tail.svh"
   `include "includes/head.svh"
   `include "includes/over.svh"
-`endif // _INCL_DEFINITIONS
+`endif // QUSESTA
 
 module  vga_pic
 (
@@ -18,7 +15,7 @@ module  vga_pic
     input   wire            sys_rst_n   ,   // Input reset signal, low level is effective
     input   wire    [09:0]  pix_x       ,   // Input the X-axis coordinate of the pixel point in the VGA effective display area
     input   wire    [09:0]  pix_y       ,   // Input the Y-axis coordinate of the pixel point in the VGA effective display area
-    input   wire    [3 :0]  data_in     ,
+    input   wire    [03:0]  data_in     ,
     
     output  wire    [15:0]  pix_data    ,   // Output pixel color information
     output  reg     [19:0]  score           // Output total score
@@ -54,6 +51,9 @@ reg  [12:0]   addrb       ;    //background, background image address
 reg  [9:0]    addrc       ;    //tail, trash can address
 reg  [8:0]    addrd       ;    //head, trash can head address
 reg  [13:0]   addre       ;    //gameover, game end address
+
+wire [15:00]  color_filter1;    //bird down's a color background is filter as a color back
+wire [15:00]  color_filter2;    //bird up's a color background is filter as a color back
                           
 reg [15:0]   douta       ;
 reg [15:0]   douta_up    ;
@@ -83,8 +83,6 @@ parameter   bird_wid       =   8'd32,   //Width of the bird
 // Game end judgment
 always@(posedge vga_clk or negedge sys_rst_n)
     if(sys_rst_n == 1'b0)
-        finish <= 0 ;
-    else if (data_in == 4'b0100) 
         finish <= 0 ;
     else begin
         if(finish == 1'b1)
@@ -120,28 +118,23 @@ always@(posedge vga_clk or negedge sys_rst_n)
         ps_locy  <= 223;
         state    <= 0  ;
     end
-    else if (data_in == 4'b0100) begin
-        // Bird's position and up and down status
-        ps_locx  <= 303;  
-        ps_locy  <= 223;
-        state    <= 0  ;
-    end else begin
+    else begin
         if(finish == 1'b1) begin
             ps_locy <= ps_locy;
             ps_locx <= ps_locx;
         end
-        else if(pix_x == 12'h0 && pix_y == 12'h0) begin
+        else if(pix_x == 12'h0 && pix_y == 12'h0 && data_in[2]) begin
             // state：0-7 The bird falls down at position y with uniform acceleration. If key1 is detected, it jumps to 8 to rise.
             // state：8-15 The bird's position y rises at a uniform deceleration.
             case(state)
-                0 : begin state <= (data_in == 4'b0001)? 8:1; ps_locy  <= ps_locy + speed * 1; end
-                1 : begin state <= (data_in == 4'b0001)? 8:2; ps_locy  <= ps_locy + speed * 1; end
-                2 : begin state <= (data_in == 4'b0001)? 8:3; ps_locy  <= ps_locy + speed * 2; end
-                3 : begin state <= (data_in == 4'b0001)? 8:4; ps_locy  <= ps_locy + speed * 2; end
-                4 : begin state <= (data_in == 4'b0001)? 8:5; ps_locy  <= ps_locy + speed * 3; end
-                5 : begin state <= (data_in == 4'b0001)? 8:6; ps_locy  <= ps_locy + speed * 3; end
-                6 : begin state <= (data_in == 4'b0001)? 8:7; ps_locy  <= ps_locy + speed * 4; end
-                7 : begin state <= (data_in == 4'b0001)? 8:7; ps_locy  <= ps_locy + speed * 4; end
+                0 : begin state <= (data_in[0])? 8:1; ps_locy  <= ps_locy + speed * 2; end
+                1 : begin state <= (data_in[0])? 8:2; ps_locy  <= ps_locy + speed * 2; end
+                2 : begin state <= (data_in[0])? 8:3; ps_locy  <= ps_locy + speed * 2; end
+                3 : begin state <= (data_in[0])? 8:4; ps_locy  <= ps_locy + speed * 2; end
+                4 : begin state <= (data_in[0])? 8:5; ps_locy  <= ps_locy + speed * 2; end
+                5 : begin state <= (data_in[0])? 8:6; ps_locy  <= ps_locy + speed * 2; end
+                6 : begin state <= (data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
+                7 : begin state <= (data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
                 8 : begin state <= 9 ; ps_locy  <= ps_locy - 20; end
                 9 : begin state <= 10; ps_locy  <= ps_locy - 16; end
                 10: begin state <= 11; ps_locy  <= ps_locy - 12; end
@@ -151,7 +144,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
                 14: begin state <= 15; ps_locy  <= ps_locy - 2 ; end
                 15: begin state <= 0 ; ps_locy  <= ps_locy - 1 ; end
             endcase
-            ps_locx <= (data_in == 4'b0010)? ps_locx - 5 * speed : ((data_in == 4'b1000) ? ps_locx + 5 * speed : ps_locx);
+            ps_locx <= (data_in[1])? ps_locx - 5 * speed : ((data_in[3]) ? ps_locx + 5 * speed : ps_locx);
         end
     end
 
@@ -164,17 +157,11 @@ always@(posedge vga_clk or negedge sys_rst_n)
             num2       <= 5  ;// Length of trash can 2
             score      <= 0  ;// Current score
         end
-    else if (data_in == 4'b0100) begin
-            bin_locx1  <= 576;  
-            bin_locx2  <= 256;
-            num1       <= 3  ;// Length of trash can 1
-            num2       <= 5  ;// Length of trash can 2
-            score      <= 0  ;// Current score
-    end else begin
+    else begin
         if(finish ==1'b1) begin
             bin_locx1 <= bin_locx1;
             bin_locx2 <= bin_locx2;
-        end else if(pix_x == 12'h0 && pix_y == 12'h0) 
+        end else if(pix_x == 12'h0 && pix_y == 12'h0 && data_in[2]) 
         begin
             if(bin_locx1 > 2) begin
                 bin_locx1  <= bin_locx1 - 2; // Gradually move left
@@ -184,6 +171,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
                 num1 <= (num1 > 6)? 2 : num1 + 1 ; // The length gradually increases
                 score <= (score>100)? 0 : score + 1; // Add one to the score
             end
+            //
             if(bin_locx2 > 2) begin
                 bin_locx2  <= bin_locx2 - 2;
                 end
@@ -197,7 +185,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
 
 // Image display
 always@(posedge vga_clk or negedge sys_rst_n)
-    if(sys_rst_n == 1'b0)begin     
+    if (sys_rst_n == 1'b0) begin     
             addra       <= 0;
             addra_up    <= 0;
             addra_down  <= 0;
@@ -212,21 +200,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
             flag_back   <= 0;
             flag_over   <= 0;
         end
-    else if (data_in == 4'b0100) begin 
-            addra       <= 0;
-            addra_up    <= 0;
-            addra_down  <= 0;
-            addrc       <= 0;
-            addrd       <= 0;
-            addre       <= 0;
-            flag_tail1  <= 0;
-            flag_tail2  <= 0;
-            flag_head1  <= 0;
-            flag_head2  <= 0;
-            flag_bird   <= 0;
-            flag_back   <= 0;
-            flag_over   <= 0;
-    end else begin
+    else begin
         // Trash bin 1 is divided into tail and head
         if((pix_x >= bin_locx1 && pix_x <= bin_locx1 + tail_wid - 1 && pix_y >= 0 && pix_y <= tail_height * num1 - 1) ||
            (pix_x >= bin_locx1 && pix_x <= bin_locx1 + tail_wid - 1 && pix_y >= tail_height * (num1+blank) && pix_y <= 480 - 1)) begin
@@ -268,7 +242,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
         end else flag_over <= 1'b0;
         
         // Background judgment
-        if(pix_y >= 352) begin
+        if(pix_y >= 352 && pix_y < 480) begin
             flag_back <= 1'b1;
         end else flag_back <= 1'b0;
     end
@@ -279,19 +253,22 @@ assign pix_data = (finish == 1'b1 )?
                   (flag_head1  == 1'b1)? doutd :                                //head1
                   (flag_tail2  == 1'b1)? doutc :                                //tail2
                   (flag_head2  == 1'b1)? doutd :                                //head2
-                  (flag_bird   == 1'b1)? ((state <=7)? douta_down : douta_up):  //bird
+                  (flag_bird   == 1'b1)? ((state <=7)? color_filter1 : color_filter2):  //bird
                   (flag_back   == 1'b1)? doutb :                                //background
                   16'h4e19 ) :                                                  //blue_background
                   ((flag_tail1 == 1'b1)? doutc :                                //tail1
                   (flag_head1  == 1'b1)? doutd :                                //head1
                   (flag_tail2  == 1'b1)? doutc :                                //tail2
                   (flag_head2  == 1'b1)? doutd :                                //head2
-                  (flag_bird   == 1'b1)? ((state <=7)? douta_down : douta_up):  //bird
+                  (flag_bird   == 1'b1)? ((state <=7)? color_filter1 : color_filter2):  //bird
                   (flag_back   == 1'b1)? doutb :                                //background
                   16'h4e19 );                                                   //blue_background
 
+assign color_filter1 = (pix_y >= 352 && pix_y < 480 && douta_down == 16'h0000) ? doutb : douta_down;
+assign color_filter2 = (pix_y >= 352 && pix_y < 480 && douta_up   == 16'h0000) ? doutb : douta_up;
+
 /* Database */
-`ifdef FPGA
+`ifndef QUESTA
    // bird up
    bird_up bird_up_pix (.address(addra_up), .clock(vga_clk), .q(douta_up));
    

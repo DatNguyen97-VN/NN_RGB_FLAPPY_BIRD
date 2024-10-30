@@ -6,10 +6,10 @@ module  vga_ctrl
     input   wire            sys_rst_n   ,   // Input reset signal, low level is effective
     input   wire    [15:0]  pix_data    ,   // Input pixel color information
 
-    output  wire    [11:0]  pix_x       ,   // Output the X-axis coordinates of the pixels in the effective VGA display area
-    output  wire    [11:0]  pix_y       ,   // Output the Y-axis coordinate of the pixel point in the VGA effective display area
-    output  wire            hsync       ,   // Output line synchronization signal
-    output  wire            vsync       ,   // Output field sync signal
+    output  wire    [09:0]  pix_x       ,   // Output the X-axis coordinates of the pixels in the effective VGA display area
+    output  wire    [09:0]  pix_y       ,   // Output the Y-axis coordinate of the pixel point in the VGA effective display area
+    output  reg             hsync       ,   // Output line synchronization signal
+    output  reg             vsync       ,   // Output field sync signal
     output  wire            rgb_valid   ,
     output  wire    [15:0]  rgb             // Output pixel color information
 );
@@ -105,11 +105,11 @@ assign rgb_valid = ((Hcnt < H_DISPLAY) && (Vcnt < V_DISPLAY)) ? 1'b1 : 1'b0;
 assign pix_data_req = ((Hcnt < H_DISPLAY - 1'b1) && (Vcnt < V_DISPLAY)) ? 1'b1 : 1'b0;
 
 //pix_x,pix_y: VGA effective display area pixel coordinates
-assign pix_x = pix_data_req ? (Hcnt + 1'b1) : 10'h3ff;
+assign pix_x = pix_data_req ? Hcnt : 10'h3ff;
 
-assign pix_y = pix_data_req ? Vcnt  : 10'h3ff;
+assign pix_y = pix_data_req ? Vcnt : 10'h3ff;
 
 //rgb: output pixel color information
-assign rgb = (rgb_valid == 1'b1) ? pix_data : 16'b0;
+assign rgb = rgb_valid ? pix_data : 16'b0;
 
 endmodule

@@ -23,8 +23,8 @@ module  flappy_bird_logic
 //********************************************************************//
 //wire define
 wire            rst_n   ;   // VGA module reset signal
-wire    [11:0]  pix_x   ;   // VGA effective display area X-axis coordinate
-wire    [11:0]  pix_y   ;   // VGA effective display area Y-axis coordinate
+wire    [09:0]  pix_x   ;   // VGA effective display area X-axis coordinate
+wire    [09:0]  pix_y   ;   // VGA effective display area Y-axis coordinate
 wire    [15:0]  pix_data;   // VGA pixel color information
 wire            hsync   ;   // Output line synchronization signal
 wire            vsync   ;   // Output field synchronization signal
@@ -88,9 +88,9 @@ led led_inst
 );
 
 /* VGA Signals */
-assign vga_red   = {rgb[15:11], 3'b000};
-assign vga_green = {rgb[10:05], 2'b00};
-assign vga_blue  = {rgb[04:00], 3'b000};
+assign vga_red   = {rgb[15:11], rgb[15:13]};
+assign vga_green = {rgb[10:05], rgb[10:09]};
+assign vga_blue  = {rgb[04:00], rgb[04:02]};
 
 assign vga_hsync = hsync;
 assign vga_vsync = vsync;
