@@ -11,14 +11,13 @@ module  vga_ctrl
     output  reg             hsync       ,   // Output line synchronization signal
     output  reg             vsync       ,   // Output field sync signal
     output  wire            rgb_valid   ,
+	output  reg             activeArea  ,
     output  wire    [15:0]  rgb             // Output pixel color information
 );
 
 //********************************************************************//
 //****************** Parameter and Internal Signal *******************//
 //********************************************************************//
-//wire  define
-wire pix_data_req;  // Pixel color information request signal
 
 logic [09:00] Hcnt; // Line sync signal counter
 logic [09:00] Vcnt; // Field sync signal counter
@@ -52,27 +51,27 @@ always_ff @(posedge vga_clk or negedge sys_rst_n) begin
 			Hcnt <= '0;
 			if (Vcnt == V_TOTAL) begin // 524
 				Vcnt <= '0;
-				//activeArea <= 1'b1;
+				activeArea <= 1'b1;
 			end else begin
 				/*// 320x240
 				if (!mode && (Vcnt < 240-1)) begin
 					activeArea <= 1'b1;
-				end
-				// 160x120
-				if (mode && (Vcnt < 120-1)) begin
-					activeArea <= 1'b1;
 				end */
+				// 160x120
+				if (Vcnt < 120-1) begin
+					activeArea <= 1'b1;
+				end
 				Vcnt <= Vcnt + 1;
 			end
 		end else begin
 			/* // 320x240
 			if (!mode && (Hcnt == 320-1)) begin
 				activeArea <= 1'b0;
-			end
-			// 160x120
-			if (mode && (Hcnt == 160-1)) begin
-				activeArea <= 1'b0;
 			end */
+			// 160x120
+			if (Hcnt == 160-1) begin
+				activeArea <= 1'b0;
+			end
 			Hcnt <= Hcnt + 1;
 		end
 	end
@@ -101,13 +100,10 @@ end
 // rgb_valid: VGA valid display area
 assign rgb_valid = ((Hcnt < H_DISPLAY) && (Vcnt < V_DISPLAY)) ? 1'b1 : 1'b0;
 
-//pix_data_req: pixel color information request signal, one clock cycle ahead of rgb_valid signal
-assign pix_data_req = ((Hcnt < H_DISPLAY - 1'b1) && (Vcnt < V_DISPLAY)) ? 1'b1 : 1'b0;
-
 //pix_x,pix_y: VGA effective display area pixel coordinates
-assign pix_x = pix_data_req ? Hcnt : 10'h3ff;
+assign pix_x = rgb_valid ? Hcnt : 10'h3ff;
 
-assign pix_y = pix_data_req ? Vcnt : 10'h3ff;
+assign pix_y = rgb_valid ? Vcnt : 10'h3ff;
 
 //rgb: output pixel color information
 assign rgb = rgb_valid ? pix_data : 16'b0;

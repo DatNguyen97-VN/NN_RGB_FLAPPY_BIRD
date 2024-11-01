@@ -5,6 +5,7 @@ module  flappy_bird_logic
     input   wire            sys_clk     ,   // input working clock, frequency 50MHz
     input   wire            sys_rst_n   ,   // input reset signal, low level valid
     input   wire  [3:0]     data_in     ,   // input button
+    input   wire  [1:0]     sel_in      ,   // input selection
     
     output  wire  [3:0]     led_out,
     output  wire            vga_hsync     ,
@@ -32,6 +33,8 @@ wire    [15:0]  rgb     ;   // Output pixel information
 wire            rgb_valid;
 wire    [19:0]  score   ;
 reg             vga_clk_gen;
+wire    [05:0]  stable_signal;      
+wire            activeArea;  
 
 //rst_n: VGA module reset signal
 assign  rst_n   = sys_rst_n;
@@ -61,20 +64,21 @@ vga_ctrl  vga_ctrl_inst
     .hsync      (hsync      ),  // Output line synchronization signal, 1bit
     .vsync      (vsync      ),  // Output field synchronization signal, 1bit
     .rgb_valid  (rgb_valid  ),
+    .activeArea (activeArea ),
     .rgb        (rgb        )   // Output pixel color information, 16bit
 );
 
 //------------- vga_pic_inst -------------
 vga_pic vga_pic_inst
 (
-    .vga_clk    (vga_clk_gen    ),  // Input working clock, frequency 25MHz, 1bit
-    .sys_rst_n  (rst_n      ),  // Input reset signal, low level is valid, 1bit
-    .pix_x      (pix_x      ),  // Input VGA effective display area pixel point X-axis coordinate, 10bit
-    .pix_y      (pix_y      ),  // Input VGA effective display area pixel point Y-axis coordinate, 10bit
-    .data_in    (data_in    ),
+    .vga_clk    (vga_clk_gen        ),  // Input working clock, frequency 25MHz, 1bit
+    .sys_rst_n  (rst_n              ),  // Input reset signal, low level is valid, 1bit
+    .pix_x      (pix_x              ),  // Input VGA effective display area pixel point X-axis coordinate, 10bit
+    .pix_y      (pix_y              ),  // Input VGA effective display area pixel point Y-axis coordinate, 10bit
+    .data_in    (stable_signal[3:0] ),
+    .sel_in     (stable_signal[5:4] ),
     
-    .pix_data   (pix_data   ),  // Output pixel point color information, 16bit
-    .score      (score      )
+    .pix_data   (pix_data           )   // Output pixel point color information, 16bit
 );
 
 /* RED LED */
@@ -87,10 +91,18 @@ led led_inst
     .led_out      (led_out   )   //output    led_out
 );
 
+/* Debounce Signal */
+debounce debounce_delay (
+    .clk           (sys_clk           ),
+    .reset_n       (sys_rst_n         ),
+    .noisy_signal  ({sel_in, data_in} ),
+    .stable_signal (stable_signal     )
+);
+
 /* VGA Signals */
-assign vga_red   = {rgb[15:11], rgb[15:13]};
-assign vga_green = {rgb[10:05], rgb[10:09]};
-assign vga_blue  = {rgb[04:00], rgb[04:02]};
+assign vga_red   = activeArea ? '1 : {rgb[15:11], rgb[15:13]};
+assign vga_green = activeArea ? '1 : {rgb[10:05], rgb[10:09]};
+assign vga_blue  = activeArea ? '1 : {rgb[04:00], rgb[04:02]};
 
 assign vga_hsync = hsync;
 assign vga_vsync = vsync;
