@@ -8,15 +8,26 @@ module  flappy_bird_logic
     input   wire  [1:0]     sel_in      ,   // input selection
     
     output  wire  [3:0]     led_out,
-    output  wire            vga_hsync     ,
-    output  wire            vga_vsync     ,
+    output  wire            vga_hsync   ,
+    output  wire            vga_vsync   ,
     output  wire            Nblank  ,
     output  wire            Nsync  ,
     output  wire            vga_clk,
     output  wire  [7:0]     vga_red,
     output  wire  [7:0]     vga_green,
-    output  wire  [7:0]     vga_blue
+    output  wire  [7:0]     vga_blue,
 
+    input   wire            slide_sw_resend_reg_values,
+    /* Camera signals */
+	input  logic            ov7670_pclk,      
+    output logic            ov7670_xclk,      
+    input  logic            ov7670_vsync,     
+    input  logic            ov7670_href,      
+    input  logic [7:0]      ov7670_data,
+    output logic            ov7670_sioc,      
+    inout  wire             ov7670_siod,      
+    output logic            ov7670_pwdn,      
+    output logic            ov7670_reset     
 );
 
 //********************************************************************//
@@ -31,10 +42,12 @@ wire            hsync   ;   // Output line synchronization signal
 wire            vsync   ;   // Output field synchronization signal
 wire    [15:0]  rgb     ;   // Output pixel information
 wire            rgb_valid;
-wire    [19:0]  score   ;
 reg             vga_clk_gen;
 wire    [05:0]  stable_signal;      
 wire            activeArea;  
+wire    [07:0]  vga_r;
+wire    [07:0]  vga_g;
+wire    [07:0]  vga_b;
 
 //rst_n: VGA module reset signal
 assign  rst_n   = sys_rst_n;
@@ -81,7 +94,7 @@ vga_pic vga_pic_inst
     .pix_data   (pix_data           )   // Output pixel point color information, 16bit
 );
 
-/* RED LED */
+/* RED LED */  
 led led_inst
 (   
     .clk          (vga_clk_gen   ),
@@ -99,10 +112,35 @@ debounce debounce_delay (
     .stable_signal (stable_signal     )
 );
 
+/* CMOS Camera OV7670 */
+digital_cam_impl digital_cam_impl_inst (
+    .clk_50                        (sys_clk                    ),                       
+    .btn_RESET                     (sys_rst_n                  ),                    
+    .slide_sw_resend_reg_values    (slide_sw_resend_reg_values ),   
+    .slide_sw_NORMAL_OR_HANDDETECT (1'b0                       ),
+    .vga_vsync                     (vsync                      ),                    
+    .vga_r                         (vga_r                      ),                  
+    .vga_g                         (vga_g                      ),                  
+    .vga_b                         (vga_b                      ),                  
+    .activeArea                    (activeArea                 ),                   
+    .ov7670_pclk                   (ov7670_pclk                ),                  
+    .ov7670_xclk                   (ov7670_xclk                ),                  
+    .ov7670_vsync                  (ov7670_vsync               ),                 
+    .ov7670_href                   (ov7670_href                ),                  
+    .ov7670_data                   (ov7670_data                ),            
+    .ov7670_sioc                   (ov7670_sioc                ),          
+    .ov7670_siod                   (ov7670_siod                ),          
+    .ov7670_pwdn                   (ov7670_pwdn                ),               
+    .ov7670_reset                  (ov7670_reset               ),          
+    .LED_config_finished           (                           ),          
+    .LED_dll_locked                (                           ),               
+    .LED_done                      (                           )               
+);
+
 /* VGA Signals */
-assign vga_red   = activeArea ? '1 : {rgb[15:11], rgb[15:13]};
-assign vga_green = activeArea ? '1 : {rgb[10:05], rgb[10:09]};
-assign vga_blue  = activeArea ? '1 : {rgb[04:00], rgb[04:02]};
+assign vga_red   = activeArea ? vga_r : {rgb[15:11], rgb[15:13]};
+assign vga_green = activeArea ? vga_g : {rgb[10:05], rgb[10:09]};
+assign vga_blue  = activeArea ? vga_b : {rgb[04:00], rgb[04:02]};
 
 assign vga_hsync = hsync;
 assign vga_vsync = vsync;
