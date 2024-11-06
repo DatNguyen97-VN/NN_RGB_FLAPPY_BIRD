@@ -12,16 +12,12 @@ module digital_cam_impl(
 	input  logic btn_RESET,                        // Manual reset (KEY0)
 	input  logic slide_sw_resend_reg_values,       // Rewrite all OV7670's registers (resend signal)
 	input  logic slide_sw_NORMAL_OR_HANDDETECT,    // Mode selection: 0 for normal video, 1 for hand tracking
-	input  logic mode_320x240_160x120,             // Mode selection: 0 for 320x240, 1 for 160x120
 	/* VGA signals */
-	output logic vga_hsync,                        // Horizontal sync signal for VGA
-	output logic vga_vsync,                        // Vertical sync signal for VGA
+	input  logic vga_vsync,                        // Vertical sync signal for VGA
 	output logic [7:0] vga_r,                      // Red VGA output (8-bit)
 	output logic [7:0] vga_g,                      // Green VGA output (8-bit)
 	output logic [7:0] vga_b,                      // Blue VGA output (8-bit)
-	output logic vga_blank_N,                      // VGA blanking signal
-	output logic vga_sync_N,                       // VGA sync signal
-	output logic vga_CLK,                          // VGA clock
+	input  logic activeArea,                       // Indicates active area of the screen for VGA
 	/* Camera signals */
 	input  logic ov7670_pclk,                      // Pixel clock from OV7670 camera
 	output logic ov7670_xclk,                      // Clock signal to OV7670 camera
@@ -35,7 +31,8 @@ module digital_cam_impl(
 	/* Status LEDs */
 	output logic LED_config_finished,              // Indicates when OV7670 camera configuration is done
 	output logic LED_dll_locked,                   // Indicates when the PLL is locked
-	output logic LED_done                          // Indicates when the video processing is done
+	output logic LED_done,                         // Indicates when the video processing is done
+	output int   position                          // centroids of the object follow y-axis
 );
 
 	// Buffer 1 signals for storing video frames
@@ -43,7 +40,7 @@ module digital_cam_impl(
 	logic [16:0] wraddress_buf_1;                  // Write address for buffer 1
 	logic [15:0] wrdata_buf_1;                     // Write data for buffer 1
 	logic [16:0] rdaddress_buf_1;                  // Read address for buffer 1
-	logic [15:0] rddata_buf_1;                     // Read data from buffer 1
+	logic [23:0] rddata_buf_1;                     // Read data from buffer 1
 
 	// Signals multiplexed into buffer 1
 	logic [16:0] rdaddress_buf12_from_addr_gen;    // Address generator output for buffer 1 read address
@@ -58,12 +55,18 @@ module digital_cam_impl(
 
 	// VGA-related signals
 	logic [7:0] red, green, blue;                  // RGB signals for VGA output
-	logic activeArea;                              // Indicates active area of the screen for VGA
 	logic nBlank;                                  // VGA blanking signal
 	logic vSync;                                   // VGA vertical sync signal
 
 	// Multiplexing buffer data to RGB output
 	logic [15:0] data_to_rgb;                      // Data from buffer to RGB for VGA
+
+	// Neural network signals for color dection
+	logic [07:0] nn_vga_r;
+	logic [07:0] nn_vga_g;
+	logic [07:0] nn_vga_b;
+	logic        nn_we;
+	logic [16:0] nn_addr;
 
 	// FSM states for controlling the camera
 	typedef enum int {
@@ -102,7 +105,6 @@ module digital_cam_impl(
 				if (!slide_sw_NORMAL_OR_HANDDETECT) begin
 					// Normal video mode
 					state_next = S4_NORMAL_VIDEO_MODE;
-					data_to_rgb = rddata_buf_1;       // Display buffer 1 on VGA
 					wren_buf_1 = wren_buf1_from_ov7670_capture;
 					wraddress_buf_1 = wraddress_buf1_from_ov7670_capture;
 					wrdata_buf_1 = wrdata_buf1_from_ov7670_capture;
@@ -114,7 +116,6 @@ module digital_cam_impl(
 			S4_NORMAL_VIDEO_MODE: begin
 				// Same as S0_RESET for now, can be extended later
 				state_next = S4_NORMAL_VIDEO_MODE;
-				data_to_rgb = rddata_buf_1;
 				wren_buf_1 = wren_buf1_from_ov7670_capture;
 				wraddress_buf_1 = wraddress_buf1_from_ov7670_capture;
 				wrdata_buf_1 = wrdata_buf1_from_ov7670_capture;
@@ -149,9 +150,9 @@ module digital_cam_impl(
 		.rdclock   (clk_25_vga),
 		.q         (rddata_buf_1),
 		.wrclock   (clk_25_vga),
-		.wraddress (wraddress_buf_1),
-		.data      (wrdata_buf_1),
-		.wren      (wren_buf_1)
+		.wraddress (nn_addr),
+		.data      ({nn_vga_r, nn_vga_g, nn_vga_b}),
+		.wren      (nn_we)
 	);
 
 	// OV7670 camera controller for setting up the camera registers
@@ -173,13 +174,13 @@ module digital_cam_impl(
 		.vsync        (ov7670_vsync),
 		.href         (ov7670_href),
 		.d            (ov7670_data),
-		.mode         (mode_320x240_160x120),
 		.addr         (wraddress_buf1_from_ov7670_capture),
 		.dout         (wrdata_buf1_from_ov7670_capture),
 		.we           (wren_buf1_from_ov7670_capture),
 		.end_of_frame ()
 	);
 
+    /*
 	// VGA block to drive VGA signals
 	VGA Inst_VGA (
 		.rst        (btn_RESET),
@@ -191,32 +192,49 @@ module digital_cam_impl(
 		.Nblank     (nBlank),
 		.Nsync      (vga_sync_N),
 		.activeArea (activeArea)
-	);
+	); */
 
 	// RGB block to convert buffer data to VGA RGB signals
 	RGB Inst_RGB (
-		.Din    (data_to_rgb),
-		.Nblank (activeArea),
+		.Din    (wrdata_buf1_from_ov7670_capture),
+		.Nblank (1'b1),
 		.R      (red),
 		.G      (green),
 		.B      (blue)
 	);
 
 	// VGA signal assignments
-	assign vga_r = red;
-	assign vga_g = green;
-	assign vga_b = blue;
-	assign vga_vsync = vSync;
-	assign vga_blank_N = nBlank;
+	assign vga_r = rddata_buf_1[23:16];
+	assign vga_g = rddata_buf_1[15:08];
+	assign vga_b = rddata_buf_1[07:00];
 
 	// Address generator for reading frame buffer
 	Address_Generator Inst_Address_Generator (
 		.rst     (btn_RESET),
 		.clk25   (clk_25_vga),
 		.enable  (activeArea),
-		.mode    (mode_320x240_160x120),
-		.vsync   (vSync),
+		.vsync   (vga_vsync),
 		.address (rdaddress_buf12_from_addr_gen)
 	);
+
+	/* Neural Network RGB */
+    nn_rgb nn_rgb_inst (
+        .clk       (clk_25_vga    ),
+        .reset_n   (btn_RESET  ),
+		.vsync     (ov7670_vsync),
+        .addr_in   (wraddress_buf1_from_ov7670_capture         ),
+        .we_in     (wren_buf1_from_ov7670_capture ),
+        .r_in      (red        ),
+        .g_in      (green      ),
+        .b_in      (blue       ),
+        .addr_out  (nn_addr           ),
+        .we_out    (nn_we          ),
+        .r_out     (nn_vga_r   ),
+        .g_out     (nn_vga_g   ),
+        .b_out     (nn_vga_b   ),
+        .clk_o     (           ),
+        .led       (           ),
+		.y_position(position   )
+    );
 
 endmodule
