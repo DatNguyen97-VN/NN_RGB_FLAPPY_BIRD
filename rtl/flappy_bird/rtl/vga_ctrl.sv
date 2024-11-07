@@ -58,7 +58,7 @@ always_ff @(posedge vga_clk or negedge sys_rst_n) begin
 					activeArea <= 1'b1;
 				end */
 				// 160x120
-				if (Vcnt < 120-1) begin
+				if (Vcnt < 120) begin
 					activeArea <= 1'b1;
 				end
 				Vcnt <= Vcnt + 1;

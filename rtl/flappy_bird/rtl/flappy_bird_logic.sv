@@ -13,7 +13,7 @@ module  flappy_bird_logic
     output  wire            Nblank  ,
     output  wire            Nsync  ,
     output  wire            vga_clk,
-    output  wire  [7:0]     vga_red,
+    output  wire  [7:0]     vga_red,  
     output  wire  [7:0]     vga_green,
     output  wire  [7:0]     vga_blue,
 
@@ -48,6 +48,8 @@ wire            activeArea;
 wire    [07:0]  vga_r;
 wire    [07:0]  vga_g;
 wire    [07:0]  vga_b;
+wire    [31:0]  y_position;
+wire    [31:0]  x_position;
 
 //rst_n: VGA module reset signal
 assign  rst_n   = sys_rst_n;
@@ -134,13 +136,16 @@ digital_cam_impl digital_cam_impl_inst (
     .ov7670_reset                  (ov7670_reset               ),          
     .LED_config_finished           (                           ),          
     .LED_dll_locked                (                           ),               
-    .LED_done                      (                           )               
+    .LED_done                      (                           ),
+    .y_position                    (y_position                 ),
+    .x_position                    (x_position                 )                    
 );
 
+
 /* VGA Signals */
-assign vga_red   = activeArea ? vga_r : {rgb[15:11], rgb[15:13]};
-assign vga_green = activeArea ? vga_g : {rgb[10:05], rgb[10:09]};
-assign vga_blue  = activeArea ? vga_b : {rgb[04:00], rgb[04:02]};
+assign vga_red   = activeArea ? ((pix_y == y_position) || (pix_x == x_position)) ? 8'hff : vga_r : {rgb[15:11], rgb[15:13]};
+assign vga_green = activeArea ? ((pix_y == y_position) || (pix_x == x_position)) ? 8'h00 : vga_g : {rgb[10:05], rgb[10:09]};
+assign vga_blue  = activeArea ? ((pix_y == y_position) || (pix_x == x_position)) ? 8'h00 : vga_b : {rgb[04:00], rgb[04:02]};
 
 assign vga_hsync = hsync;
 assign vga_vsync = vsync;

@@ -1,7 +1,7 @@
-`ifndef  _INCL_DEFINITIONS
-  `define _INCL_DEFINITIONS
-  import CONFIG::*;
-`endif // _INCL_DEFINITIONS
+//`ifndef  _INCL_DEFINITIONS
+//  `define _INCL_DEFINITIONS
+//  `include "../../nn_rgb/config.sv"
+//`endif // _INCL_DEFINITIONS
 
 module neuron #(
     parameter int h_weight_idx = 0, // high index of weight element for neuron in layer
@@ -9,6 +9,7 @@ module neuron #(
 ) (
     input logic clk,
     input logic [31:0] l_connection_idx,
+    input logic [11:0][7:0] connection,
     output logic [7:0] out
 );
     // adress for the lookup table
@@ -53,19 +54,19 @@ module neuron #(
 
     // limiting result for sigmoid
     always_ff @(posedge clk) begin
-      if (sumForActivation < -65536) begin
+      if (sumForActivation < -32768) begin
         sumAdress <= '0;
-      end else if (sumForActivation > 65535) begin
+      end else if (sumForActivation > 32767) begin
         sumAdress <= '1;
       end else begin
-        sumAdress <= sumForActivation + 65536;
+        sumAdress <= sumForActivation + 32768;
       end
     end
 
     // lookup table for the sigmoid function
-    sigmoid_IP sigmoid (
+    sigmoid sigmoid_inst (
       .clock   (clk),
-      .address (sumAdress),
+      .address (sumAdress[15:04]),
       .q       (afterActivation)
     );
 

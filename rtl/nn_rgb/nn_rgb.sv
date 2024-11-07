@@ -1,36 +1,39 @@
-// top level
-`ifndef  _INCL_DEFINITIONS
-  `define _INCL_DEFINITIONS
-  import CONFIG::*;
-`endif // _INCL_DEFINITIONS
+//`ifndef  _INCL_DEFINITIONS
+//  `define _INCL_DEFINITIONS
+//  `include "../../nn_rgb/config.sv"
+//`endif // _INCL_DEFINITIONS
 
 module nn_rgb (
     /* control signals */
     input logic clk, // input clock 74.25 MHz, video 720p
     input logic reset_n, // reset (invoked during configuration)
-    input logic [2:0] enable_in, // three slide switches
     /* video in */
-    input logic vs_in, // vertical sync
-    input logic hs_in, // horizontal sync
-    input logic de_in, // data enable is '1' for valid pixel
+    input logic vsync_in, // Vertical sync from OV7670 camera
+    input logic [16:0] addr_in, // data address
+    input logic we_in, // write enable
     input logic [7:0] r_in, // red component of pixel
     input logic [7:0] g_in, // green component of pixel
     input logic [7:0] b_in, // blue component of pixel
     /* video out */
-    output logic vs_out, // vertical sync
-    output logic hs_out, // horizontal sync
-    output logic de_out, // data enable is '1' for valid pixel
+    output logic [16:0] addr_out, // data address
+    output logic we_out, // write enable
     output logic [7:0] r_out, // red component of pixel
     output logic [7:0] g_out, // green component of pixel
     output logic [7:0] b_out, // blue component of pixel
     /* -- */
     output logic clk_o, // output clock (do not modify)
-    output logic [2:0] led // not supported by remote lab
+    output logic [2:0] led, // not supported by remote lab
+    output int   y_position,
+    output int   x_position
 );
     // input FFs
     logic reset;
     logic [2:0] enable;
     logic vs_0, hs_0, de_0;
+
+    // connection 2 downto 0 is the input of the neural network
+	// connection 11 downto 10 is the output of the neural network
+    logic [11:0][7:0] connection;
 
     // output of signal processing
     logic vs_1, hs_1, de_1;
@@ -43,24 +46,25 @@ module nn_rgb (
     // object centroids variable
     int num_pixel; // number of pixel
     int sum_y_axis; // sum possition of pixel at y-axis
-    int y_axis; // y-axis value
+    int sum_x_axis; // sum possition of pixel at x-axis
     int aver_y_axis; // current y-axis of object
+    int aver_x_axis; // current x-axis of object
     int old_frame_y_axis; // old y-axis of object
 
-    // endline signal and FFs 
-    logic endline_ff;
+	logic vsync_hold; // Holds the last state of the vsync signal for detecting edges
 
-    // new frame FFs
-    logic frame_ff;
+    // input FFs for video control
+    logic vsync;
 
-    // y-axis value of frame and old-frame
-    logic [15:0] y_frame, y_old_frame;
+    // y-axis and x-axis value of frame and old-frame
+    int y_frame, y_old_frame;
+    int x_frame, x_old_frame;
 
     // object up
     logic up;
 
 
-    // generate the neural network with the parameters from config.vhd
+    // generate the neural network with the parameters from config.sv
     // the outer loops creates the layers and the inner loop the neurons within the layer
     // input Layer is assgined later
     genvar i,j;
@@ -75,6 +79,7 @@ module nn_rgb (
                 ) knot (
                     .clk(clk),
                     .l_connection_idx(connnectionRange[i-1]),
+                    .connection(connection),
                     .out(connection[connnectionRange[i]+j])
                 );
             end : gen_neuron
@@ -83,30 +88,23 @@ module nn_rgb (
 
     // delay the control signals for the time of the processing
     control #(
-        .delay(($size(networkStructure)-1)*4 + 1)
+        .delay(($size(networkStructure)-1)*4+1)
     ) cu (
         .clk(clk),
-        .reset(reset),
-        .vs_in(vs_0),
-        .hs_in(hs_0),
-        .de_in(de_0),
-        .vs_out(vs_1),
-        .hs_out(hs_1),
-        .de_out(de_1)
+        .vsync_i(vsync_in),
+        .addr_i(addr_in),
+        .we_i(we_in),
+        .vsync_o(vsync),
+        .addr_o(addr_out),
+        .we_o(we_out)
     );
     
     // convert RGB to luminance
     always_ff @( posedge clk ) begin : RGB_compute
-        // input FFs for control
-        reset <= ~ reset_n;
-        enable <= enable_in;
-        // input FFs for video signal
-        vs_0  <= vs_in;
-        hs_0  <= hs_in;
-        de_0  <= de_in;
-     
         // assign values of the input layer
-        connection[2:0] <= {b_in, g_in, r_in};
+        connection[0] <= r_in;
+        connection[1] <= g_in;
+        connection[2] <= b_in;
 
         // convert RGB to luminance: Y (5*R + 9*G + 2*B) / 16
         y[0] <= (5*connection[0] + 9*connection[1] + 2*connection[2]) / 16;
@@ -119,7 +117,7 @@ module nn_rgb (
     logic [7:0] luminance;
     logic [7:0] r_yellow, r_blue, r_gray;
     logic [7:0] g_yellow, g_blue, g_gray;
-    logic [7:0] b_yellow, b_blue, b_gray;
+    logic [7:0] b_yellow, b_blue, b_gray;  
 
     always_comb begin
         // output processing
@@ -141,7 +139,7 @@ module nn_rgb (
     
     // RGB output
     always_ff @(posedge clk) begin
-        if (connection[len-1] > 70) begin
+        if (connection[len-1] > 55) begin
             if (connection[len-1] > connection[len-2]) begin
                 // yellow
                 result_r <= r_yellow;
@@ -153,7 +151,7 @@ module nn_rgb (
                 result_g <= g_blue;
                 result_b <= b_blue;
             end
-        end else if (connection[len-2] > 70) begin
+        end else if (connection[len-2] > 55) begin
             // blue
             result_r <= r_blue;
             result_g <= g_blue;
@@ -165,10 +163,7 @@ module nn_rgb (
             result_b <= b_gray;
         end
 
-        // output FFs 
-        vs_out  <= vs_1;
-        hs_out  <= hs_1;
-        de_out  <= de_1;
+        // output FFs
         r_out   <= result_r;
         g_out   <= result_g;
         b_out   <= result_b;
@@ -177,44 +172,38 @@ module nn_rgb (
     /* ------------------------------------------ */
     /* Compute object centroids follow the y-axis */
     /* ------------------------------------------ */
-    always_ff @(posedge clk) begin : endline_FFs
-        endline_ff <= de_1;
-    end
-
-    always_ff @(posedge clk) begin : frame_FFs
-        frame_ff <= vs_1;
-    end
-
-    // increate y-axis variable
-    always_ff @(posedge clk) begin
-        if (!frame_ff && vs_1) begin
-            y_axis <= '0;
-        end else if (endline_ff && (!de_1)) begin
-            y_axis <= y_axis + 32'd1;
+    // detect the rising edge of vsync
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            vsync_hold <= 1'b0;
+        end else begin
+            vsync_hold <= vsync;
         end
     end
 
     // count the correct condition pixel
     always_ff @(posedge clk) begin  
-        if (!frame_ff && vs_1) begin
-            num_pixel <= '0;
-            sum_y_axis <= '0;
+        if (!vsync_hold && vsync) begin
+            num_pixel  <= 0;
+            sum_y_axis <= 0;
+            sum_x_axis <= 0;
         end else begin
-            if (connection[len-1] > 55) begin
-               if (connection[len-1] > connection[len-2]) begin
-                   sum_y_axis <= sum_y_axis + y_axis;
-                   num_pixel <= num_pixel + 32'd1;
-               end
+            if (connection[len-1] > 55 || connection[len-2] > 55) begin
+                sum_y_axis <= sum_y_axis + addr_out/159;
+                sum_x_axis <= sum_x_axis + addr_out%159;
+                num_pixel  <= num_pixel + 32'd1;
             end
         end
     end
 
     // compute average y-axis value
     always_comb begin
-        if ((num_pixel != 32'd0 ) && (sum_y_axis != 32'd0)) begin
+        if (num_pixel) begin
             aver_y_axis = sum_y_axis / num_pixel;
+            aver_x_axis = sum_x_axis / num_pixel;
         end else begin
-            aver_y_axis = '0;
+            aver_y_axis = 0;
+            aver_x_axis = 0;
         end
     end
 
@@ -223,18 +212,22 @@ module nn_rgb (
     /* ------------------------------------------ */
     always_ff @(posedge clk or negedge reset_n) begin : get_y_axis_frame
         if (!reset_n) begin
-            y_frame <= '0;
-            y_old_frame <= '0;
-        end else if (!frame_ff && vs_1) begin // check new frame
-            y_frame <= aver_y_axis;
+            y_frame     <= 0;
+            y_old_frame <= 0;
+            x_frame     <= 0;
+            x_old_frame <= 0;
+        end else if (!vsync_hold && vsync) begin // check new frame
+            y_frame     <= aver_y_axis;
             y_old_frame <= y_frame;
+            x_frame     <= aver_x_axis;
+            x_old_frame <= x_frame;
         end
     end
 
     always_ff @( posedge clk ) begin : check_frame_and_old_frame
-        if ((y_frame != 0) && (y_old_frame != 0) && // both it is zero when start system
-            (frame_ff && !vs_1) && // check at first line of third-frame
-            (y_frame > y_old_frame)) begin // check increate y-axis value
+        if (y_frame && y_old_frame && // both it is zero when start system
+            !vsync_hold && vsync && // check at first line of third-frame
+           (y_frame > y_old_frame)) begin // check increate y-axis value
             up <= 1'b1;
         end else begin
             up <= 1'b0;  
@@ -244,8 +237,10 @@ module nn_rgb (
     /* -------------------------------------------------- */
     /* Maintain turn-up signal during on 10 milion cycles */
     /* -------------------------------------------------- */
-    
+
     assign clk_o = clk;
     assign led = 3'b000;
+    assign y_position = y_frame;
+    assign x_position = x_frame;
     
 endmodule

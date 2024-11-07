@@ -9,17 +9,17 @@
 // of 2^16 = 65536 addresses; 
 
 module frame_buffer (
-	input logic [15:0] data,
+	input logic [23:0] data,
 	input logic [16:0] rdaddress,
 	input logic rdclock,
 	input logic [16:0] wraddress,
 	input logic wrclock,
 	input logic wren,
-	output logic [15:0] q
+	output logic [23:0] q
 );
 	// read signals
-	logic [15:0] q_top;
-	logic [15:0] q_bottom;
+	logic [23:0] q_top;
+	logic [23:0] q_bottom;
 
 	// write signals
 	logic wren_top;
@@ -27,9 +27,9 @@ module frame_buffer (
 
 	my_frame_buffer_15to0 Inst_buffer_top (
 		.data(data),
-		.rdaddress(rdaddress),
+		.rdaddress(rdaddress[15:0]),
 		.rdclock(rdclock),
-		.wraddress(wraddress),
+		.wraddress(wraddress[15:0]),
 		.wrclock(wrclock),
 		.wren(wren_top),
 		.q(q_top)
@@ -37,9 +37,9 @@ module frame_buffer (
 
 	my_frame_buffer_15to0 Inst_buffer_bottom (
 		.data(data),
-		.rdaddress(rdaddress),
+		.rdaddress(rdaddress[15:0]),
 		.rdclock(rdclock),
-		.wraddress(wraddress),
+		.wraddress(wraddress[15:0]),
 		.wrclock(wrclock),
 		.wren(wren_bottom),
 		.q(q_bottom)

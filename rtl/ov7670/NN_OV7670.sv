@@ -32,7 +32,8 @@ module digital_cam_impl(
 	output logic LED_config_finished,              // Indicates when OV7670 camera configuration is done
 	output logic LED_dll_locked,                   // Indicates when the PLL is locked
 	output logic LED_done,                         // Indicates when the video processing is done
-	output int   position                          // centroids of the object follow y-axis
+	output int   y_position,                       // centroids of the object follow y-axis
+	output int   x_position                        // centroids of the object follow X-axis
 );
 
 	// Buffer 1 signals for storing video frames
@@ -221,7 +222,7 @@ module digital_cam_impl(
     nn_rgb nn_rgb_inst (
         .clk       (clk_25_vga    ),
         .reset_n   (btn_RESET  ),
-		.vsync     (ov7670_vsync),
+		.vsync_in  (ov7670_vsync),
         .addr_in   (wraddress_buf1_from_ov7670_capture         ),
         .we_in     (wren_buf1_from_ov7670_capture ),
         .r_in      (red        ),
@@ -234,7 +235,8 @@ module digital_cam_impl(
         .b_out     (nn_vga_b   ),
         .clk_o     (           ),
         .led       (           ),
-		.y_position(position   )
+		.y_position(y_position ),
+		.x_position(x_position )
     );
 
 endmodule

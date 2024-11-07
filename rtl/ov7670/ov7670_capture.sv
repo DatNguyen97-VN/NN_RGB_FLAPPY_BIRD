@@ -9,7 +9,6 @@ module ov7670_capture (
 	input logic vsync,                // Vertical sync signal, used to indicate the end of a frame
 	input logic href,                 // Horizontal reference signal, indicates the start and end of a scanline
 	input logic [7:0] d,              // 8-bit data bus from the camera carrying pixel data
-	input logic mode,                 // Mode selection: 320x240 and 160x120
 	output logic [16:0] addr,         // Address output to store the captured pixels in memory
 	output logic [15:0] dout,         // 12-bit data output containing RGB pixel data
 	output logic we,                  // Write enable signal for writing data to memory
@@ -74,22 +73,16 @@ module ov7670_capture (
 		end else begin
 			// Capture pixel data when href_last[2] (320x240)
 			// and href_last[6] (160x120) indicates valid pixel transfer
-			if ((!mode && href_last[2]) || (mode && href_last[6])) begin
-				// 320x240
-				if (!mode && line[0]
-				    && href_last[2]) begin // Every 4 byte get 2 byte
-					we_reg <= 1'b1;        // Enable writing to memory when capturing valid pixels
-				end
+			if (href_last[6]) begin
 				// 160x120
-				if (mode && (line == 2'b11)
-				    && href_last[6]) begin // Every 8 byte get 2 byte
-					we_reg <= 1'b1;        // Enable writing to memory when capturing valid pixels
+				if (line == 2'b11) begin  // Every 8 byte get 2 byte
+					we_reg <= 1'b1;       // Enable writing to memory when capturing valid pixels
 				end
-				href_last <= '0;           // Reset href_last after capture
+				href_last <= '0;          // Reset href_last after capture
 			end else begin
 				href_last <= {href_last[5:0], latched_href}; // Shift href history
 			end
-			end_of_frame_reg <= 1'b0;      // Reset end-of-frame signal after handling
+			end_of_frame_reg <= 1'b0;     // Reset end-of-frame signal after handling
 		end
 	end : capture_process
 

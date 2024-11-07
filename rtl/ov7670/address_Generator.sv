@@ -2,7 +2,6 @@ module Address_Generator (
 	input logic rst,
 	input logic clk25, // 25 MHz clock and activation signal respectively
 	input logic enable,
-	input logic mode,
 	input logic vsync,
 	output logic [16:00] address // address generated
 );
@@ -18,11 +17,7 @@ module Address_Generator (
 			// if enable = 0 we stop address generation
 			if (enable) begin
 				// if the memory space is completely scanned
-				if (!mode && (val < 320*240)) begin
-					val <= val + 1;
-				end
-				//
-				if (mode && (val < 160*120)) begin
+				if (val < 160*120) begin
 					val <= val + 1;
 				end
 			end

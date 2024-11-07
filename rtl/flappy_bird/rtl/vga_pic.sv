@@ -123,7 +123,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
         if(finish == 1'b1)
             finish <= 1'b1; //Once 1 appears, save it
         else
-            if(ps_locy > 420)
+            if(ps_locy > 420 || ps_locx > 640)
                 finish <= 1; // The bird fell to the ground, GG
             else
                 // The bird collided with the trash can, GG
@@ -163,14 +163,14 @@ always@(posedge vga_clk or negedge sys_rst_n)
                 // state：0-7 The bird falls down at position y with uniform acceleration. If key1 is detected, it jumps to 8 to rise.
                 // state：8-15 The bird's position y rises at a uniform deceleration.
                 case(state)
-                    0 : begin state <= (data_in[0])? 8:1; ps_locy  <= ps_locy + speed * 2; end
-                    1 : begin state <= (data_in[0])? 8:2; ps_locy  <= ps_locy + speed * 2; end
-                    2 : begin state <= (data_in[0])? 8:3; ps_locy  <= ps_locy + speed * 2; end
-                    3 : begin state <= (data_in[0])? 8:4; ps_locy  <= ps_locy + speed * 2; end
-                    4 : begin state <= (data_in[0])? 8:5; ps_locy  <= ps_locy + speed * 2; end
-                    5 : begin state <= (data_in[0])? 8:6; ps_locy  <= ps_locy + speed * 2; end
-                    6 : begin state <= (data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
-                    7 : begin state <= (data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
+                    0 : begin state <= (!data_in[0])? 8:1; ps_locy  <= ps_locy + speed * 2; end
+                    1 : begin state <= (!data_in[0])? 8:2; ps_locy  <= ps_locy + speed * 2; end
+                    2 : begin state <= (!data_in[0])? 8:3; ps_locy  <= ps_locy + speed * 2; end
+                    3 : begin state <= (!data_in[0])? 8:4; ps_locy  <= ps_locy + speed * 2; end
+                    4 : begin state <= (!data_in[0])? 8:5; ps_locy  <= ps_locy + speed * 2; end
+                    5 : begin state <= (!data_in[0])? 8:6; ps_locy  <= ps_locy + speed * 2; end
+                    6 : begin state <= (!data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
+                    7 : begin state <= (!data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
                     8 : begin state <= 9 ; ps_locy  <= ps_locy - 20; end
                     9 : begin state <= 10; ps_locy  <= ps_locy - 16; end
                     10: begin state <= 11; ps_locy  <= ps_locy - 12; end
@@ -180,7 +180,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
                     14: begin state <= 15; ps_locy  <= ps_locy - 2 ; end
                     15: begin state <= 0 ; ps_locy  <= ps_locy - 1 ; end
                 endcase
-                ps_locx <= (data_in[1])? ps_locx - 5 * speed : ((data_in[3]) ? ps_locx + 5 * speed : ps_locx);
+                ps_locx <= (!data_in[1])? ps_locx - 5 * speed : ((!data_in[3]) ? ps_locx + 5 * speed : ps_locx);
             end
             // increate counter for wing flag
             counter <= counter + 1'b1;

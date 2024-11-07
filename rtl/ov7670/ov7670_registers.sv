@@ -51,7 +51,7 @@ module ov7670_registers (
                 8'd25 : sreg <= 16'h03_0A; // VREF   VSYNC low two bits
                 8'd26 : sreg <= 16'h0E_61; // COM5(0x0E) 0x61
                 8'd27 : sreg <= 16'h0F_4B; // COM6(0x0F) 0x4B 
-                8'd28 : sreg <= 16'h16_02; // if miss result in bug!
+                8'd28 : sreg <= 16'h16_02; // 
                 8'd29 : sreg <= 16'h1E_37; // MVFP Flip and mirror image
                 8'd30 : sreg <= 16'hB1_0C; // ABLC1
                 8'd31 : sreg <= 16'hB3_80; // THL_ST
