@@ -26,7 +26,7 @@ module  flappy_bird_logic
     input  logic [7:0]      ov7670_data,
     output logic            ov7670_sioc,      
     inout  wire             ov7670_siod,      
-    output logic            ov7670_pwdn,      
+    output logic            ov7670_pwdn,         
     output logic            ov7670_reset     
 );
 
