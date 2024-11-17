@@ -17,6 +17,7 @@ module  vga_pic
     input   logic    [09:0]  pix_y       ,   // Input the Y-axis coordinate of the pixel point in the VGA effective display area
     input   logic    [03:0]  data_in     ,
     input   logic    [01:0]  sel_in      ,
+    input   logic            re_start    ,
     
     output  logic    [15:0]  pix_data        // Output pixel color information
 );
@@ -62,39 +63,41 @@ logic  [09:0]   addr        ;    //digit
 logic  [09:0]   addr1       ;    //digit1
 logic  [09:0]   addr2       ;    //digit2
 
-logic [15:00]  color_filter1;    //bird down's a color background is filter as a color back
-logic [15:00]  color_filter2;    //bird up's a color background is filter as a color back
-logic [15:00]  color_filter3;    //game over color is filter as a blue color
+logic [15:00]  color_filter1 ;    //bird down's a color background is filter as a color back
+logic [15:00]  color_filter2 ;    //bird up's a color background is filter as a color back
+logic [15:00]  color_filter3 ;    //game over color is filter as a blue color
                           
-logic [15:0]   douta_up    ;
-logic [15:0]   douta_down  ;
-logic [15:0]   reddouta_up    ;
-logic [15:0]   reddouta_down  ;
-logic [15:0]   bluedouta_up    ;
-logic [15:0]   bluedouta_down  ;
+logic [15:0]   douta_up          ;
+logic [15:0]   douta_down        ;
+logic [15:0]   reddouta_up       ;
+logic [15:0]   reddouta_down     ;
+logic [15:0]   bluedouta_up      ;
+logic [15:0]   bluedouta_down    ;
 logic [15:0]   yellowdouta_up    ;
 logic [15:0]   yellowdouta_down  ;
-logic [15:0]   doutb       ;
-logic [15:0]   doutc       ;
-logic [15:0]   doutd       ;
-logic [15:0]   doute       ;
-logic [15:0]   dout        ;
-logic  [15:0]   dout1       ;
-logic  [15:0]   dout2       ;
-logic [15:0]   dout_0       ;
-logic [15:0]   dout_1       ;
-logic [15:0]   dout_2       ;
-logic [15:0]   dout_3       ;
-logic [15:0]   dout_4       ;
-logic [15:0]   dout_5       ;
-logic [15:0]   dout_6       ;
-logic [15:0]   dout_7       ;
-logic [15:0]   dout_8       ;
-logic [15:0]   dout_9       ;
+logic [15:0]   doutb             ;
+logic [15:0]   doutc             ;
+logic [15:0]   doutd             ;
+logic [15:0]   doute             ;
+logic [15:0]   dout              ;
+logic [15:0]   dout1             ;
+logic [15:0]   dout2             ;
+logic [15:0]   dout_0            ;
+logic [15:0]   dout_1            ;
+logic [15:0]   dout_2            ;
+logic [15:0]   dout_3            ;
+logic [15:0]   dout_4            ;
+logic [15:0]   dout_5            ;
+logic [15:0]   dout_6            ;
+logic [15:0]   dout_7            ;
+logic [15:0]   dout_8            ;
+logic [15:0]   dout_9            ;
 
-logic [03:0]   temp1        ;
-logic [03:0]   temp2        ;
-logic [06:0]   score        ;
+logic [03:0]   temp1             ;
+logic [03:0]   temp2             ;
+logic [06:0]   score             ;
+
+logic          reset             ;
 
 parameter   H_VALID =   12'd640 ,   // Row valid data
             V_VALID =   12'd480 ;   // Field valid data
@@ -115,47 +118,53 @@ parameter   bird_wid    = 8'd32,   //Width of the bird
 //***************************** Main Code ****************************//
 //********************************************************************//
 
+// system reset generation
+assign reset = sys_rst_n & re_start;
+
 // Game end judgment
-always@(posedge vga_clk or negedge sys_rst_n)
-    if(sys_rst_n == 1'b0)
-        finish <= 0 ;
-    else begin
-        if(finish == 1'b1)
-            finish <= 1'b1; //Once 1 appears, save it
-        else
-            if(ps_locy > 420 || ps_locx > 640)
-                finish <= 1; // The bird fell to the ground, GG
-            else
+always_ff @(posedge vga_clk or negedge reset) begin
+    if (!reset) begin
+        finish <= 1'b0;
+    end else if (!re_start) begin
+        finish <= 1'b0;
+    end else begin
+        if (finish) begin
+            finish <= 1'b1;
+        end else begin
+            if (ps_locy > 420 || ps_locx > 640) begin
+                finish <= 1'b1; // The bird fell to the ground, GG
+            end else begin
                 // The bird collided with the trash can, GG
                 finish <= (flag_bird && flag_tail1) || (flag_bird && flag_head1) || (flag_bird && flag_tail2) || (flag_bird && flag_head2) ;
+            end
+        end
     end
+end
 
 // Background drawing
-always@(posedge vga_clk or negedge sys_rst_n)
-    if(sys_rst_n == 1'b0)begin
-            gnd_locx  <= 0;  
-            gnd_locy  <= 0;
-            addrb <= 0;
-        end
-    else begin
+always_ff @(posedge vga_clk or negedge reset) begin
+    if (!reset) begin
+        gnd_locx <= '0;  
+        gnd_locy <= '0;
+        addrb    <= '0;
+    end else begin
         // Obtain the relative coordinates of the background. This code is one row * 10 columns
         gnd_locx <= pix_x % 64;
         gnd_locy <= pix_y % 352;
-        addrb <= gnd_locy * 64 + gnd_locx;
+        addrb    <= gnd_locy * 64 + gnd_locx;
     end
-
+end
 
 // Bird position
-always@(posedge vga_clk or negedge sys_rst_n)
-    if(sys_rst_n == 1'b0)begin
+always_ff @(posedge vga_clk or negedge reset) begin
+    if (!reset) begin
         // Bird's position and up and down status
         ps_locx  <= 303;  
         ps_locy  <= 223;
-        state    <= 0  ;
-        counter  <= 0;
-    end
-    else begin
-        if(finish == 1'b1) begin
+        state    <= '0;
+        counter  <= '0;
+    end else begin
+        if (finish) begin
             ps_locy <= ps_locy;
             ps_locx <= ps_locx;
         end else if (pix_x == 12'h0 && pix_y == 12'h0) begin
@@ -163,14 +172,14 @@ always@(posedge vga_clk or negedge sys_rst_n)
                 // state：0-7 The bird falls down at position y with uniform acceleration. If key1 is detected, it jumps to 8 to rise.
                 // state：8-15 The bird's position y rises at a uniform deceleration.
                 case(state)
-                    0 : begin state <= (!data_in[0])? 8:1; ps_locy  <= ps_locy + speed * 2; end
-                    1 : begin state <= (!data_in[0])? 8:2; ps_locy  <= ps_locy + speed * 2; end
-                    2 : begin state <= (!data_in[0])? 8:3; ps_locy  <= ps_locy + speed * 2; end
-                    3 : begin state <= (!data_in[0])? 8:4; ps_locy  <= ps_locy + speed * 2; end
-                    4 : begin state <= (!data_in[0])? 8:5; ps_locy  <= ps_locy + speed * 2; end
-                    5 : begin state <= (!data_in[0])? 8:6; ps_locy  <= ps_locy + speed * 2; end
-                    6 : begin state <= (!data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
-                    7 : begin state <= (!data_in[0])? 8:7; ps_locy  <= ps_locy + speed * 2; end
+                    0 : begin state <= (!data_in[0])? 8:1; ps_locy  <= ps_locy + speed*2; end
+                    1 : begin state <= (!data_in[0])? 8:2; ps_locy  <= ps_locy + speed*2; end
+                    2 : begin state <= (!data_in[0])? 8:3; ps_locy  <= ps_locy + speed*2; end
+                    3 : begin state <= (!data_in[0])? 8:4; ps_locy  <= ps_locy + speed*2; end
+                    4 : begin state <= (!data_in[0])? 8:5; ps_locy  <= ps_locy + speed*2; end
+                    5 : begin state <= (!data_in[0])? 8:6; ps_locy  <= ps_locy + speed*2; end
+                    6 : begin state <= (!data_in[0])? 8:7; ps_locy  <= ps_locy + speed*2; end
+                    7 : begin state <= (!data_in[0])? 8:7; ps_locy  <= ps_locy + speed*2; end
                     8 : begin state <= 9 ; ps_locy  <= ps_locy - 20; end
                     9 : begin state <= 10; ps_locy  <= ps_locy - 16; end
                     10: begin state <= 11; ps_locy  <= ps_locy - 12; end
@@ -186,48 +195,47 @@ always@(posedge vga_clk or negedge sys_rst_n)
             counter <= counter + 1'b1;
         end
     end
+end
 
 // Trash bin location
-always@(posedge vga_clk or negedge sys_rst_n)
-    if(sys_rst_n == 1'b0)begin
-            bin_locx1  <= 576;  //576
-            bin_locx2  <= 305;  //256
-            num1       <= 3  ;// Length of trash can 1
-            num2       <= 5  ;// Length of trash can 2
-        end
-    else begin
-        if(finish ==1'b1) begin
+always_ff @(posedge vga_clk or negedge reset) begin
+    if (!reset) begin
+        bin_locx1  <= 576;  //576
+        bin_locx2  <= 305;  //256
+        num1       <= 3  ;// Length of trash can 1
+        num2       <= 5  ;// Length of trash can 2
+    end else begin
+        if (finish) begin
             bin_locx1 <= bin_locx1;
             bin_locx2 <= bin_locx2;
-        end else if(pix_x == 12'h0 && pix_y == 12'h0 && data_in[2]) 
-        begin
-            if(bin_locx1 > 2) begin
-                bin_locx1  <= bin_locx1 - 2; // Gradually move left
-                end
-            else begin
-                bin_locx1  <= 640-tail_wid; // Move to the far right
-                num1 <= (num1 > 6)? 2 : num1 + 1 ; // The length gradually increases
+        end else if (pix_x == 12'h0 && pix_y == 12'h0 && data_in[2]) begin
+            // transh can 1
+            if (bin_locx1 > 2) begin
+                bin_locx1 <= bin_locx1 - 2; // Gradually move left
+            end else begin
+                bin_locx1 <= 640 - tail_wid; // Move to the far right
+                num1      <= (num1 > 6) ? 2 : num1 + 1 ; // The length gradually increases
             end
-            //
-            if(bin_locx2 > 2) begin
-                bin_locx2  <= bin_locx2 - 2;
-                end
-            else begin
-                bin_locx2  <= 640-tail_wid;
-                num2 <= (num2 > 6)? 2 : num2 + 1 ;
+            // trash can 2
+            if (bin_locx2 > 2) begin
+                bin_locx2 <= bin_locx2 - 2;
+            end else begin
+                bin_locx2 <= 640 - tail_wid;
+                num2      <= (num2 > 6) ? 2 : num2 + 1;
             end
         end
     end
+end
 
 // Compute current score
-always @(posedge vga_clk or negedge sys_rst_n) begin
-    if (!sys_rst_n) begin
-        score <= 0;   
+always_ff @(posedge vga_clk or negedge reset) begin
+    if (!reset) begin
+        score <= 0;
     end else begin
         // increate score
         if (pix_x == 12'h0 && pix_y == 12'h0 && 
           ((ps_locx == bin_locx2) || (ps_locx == bin_locx1) || // bird positions is even number
-           (ps_locx+1 == bin_locx2) || (ps_locx+1 == bin_locx1))) begin // bird positions is old number
+           (ps_locx + 1 == bin_locx2) || (ps_locx + 1 == bin_locx1))) begin // bird positions is old number
             score <= score + 1'b1;
         end
     end
@@ -276,29 +284,28 @@ always_comb begin
 end
 
 // Image display
-always@(posedge vga_clk or negedge sys_rst_n)
-    if (sys_rst_n == 1'b0) begin     
-            addra       <= 0;
-            addra_up    <= 0;
-            addra_down  <= 0;
-            addr_tail1  <= 0;
-            addr_tail2  <= 0;
-            addr_head1  <= 0;
-            addr_head2  <= 0;
-            addre       <= 0;
-            addr1       <= 0;
-            addr2       <= 0;
-            flag_tail1  <= 0;
-            flag_tail2  <= 0;
-            flag_head1  <= 0;
-            flag_head2  <= 0;
-            flag_bird   <= 0;
-            flag_back   <= 0;
-            flag_over   <= 0;
-            flag_digit1 <= 0;
-            flag_digit2 <= 0;
-        end
-    else begin
+always_ff @(posedge vga_clk or negedge reset) begin
+    if (!reset) begin
+        addra       <= 0;
+        addra_up    <= 0;
+        addra_down  <= 0;
+        addr_tail1  <= 0;
+        addr_tail2  <= 0;
+        addr_head1  <= 0;
+        addr_head2  <= 0;
+        addre       <= 0;
+        addr1       <= 0;
+        addr2       <= 0;
+        flag_tail1  <= 0;
+        flag_tail2  <= 0;
+        flag_head1  <= 0;
+        flag_head2  <= 0;
+        flag_bird   <= 0;
+        flag_back   <= 0;
+        flag_over   <= 0;
+        flag_digit1 <= 0;
+        flag_digit2 <= 0;
+    end else begin
         // Trash bin 1 is divided into tail and head
         if((pix_x >= bin_locx1 && pix_x <= bin_locx1 + tail_wid - 1 && pix_y >= 0 && pix_y <= tail_height * num1 - 1) ||
            (pix_x >= bin_locx1 && pix_x <= bin_locx1 + tail_wid - 1 && pix_y >= tail_height * (num1+blank) && pix_y <= 480 - 1)) begin
@@ -312,7 +319,7 @@ always@(posedge vga_clk or negedge sys_rst_n)
             flag_head1 <= 1'b1;
         end else flag_head1 <= 1'b0;
         
-        // Trash can 2 judgment
+        // Trash bin 2 is divided into tail and head
         if((pix_x >= bin_locx2 && pix_x <= bin_locx2 + tail_wid - 1 && pix_y >= 0 && pix_y <= tail_height * num2 - 1) ||
            (pix_x >= bin_locx2 && pix_x <= bin_locx2 + tail_wid - 1 && pix_y >= tail_height * (num2+blank) && pix_y <= 480 - 1)) begin
             addr_tail2 <= addr_tail2 + 1;
@@ -356,27 +363,28 @@ always@(posedge vga_clk or negedge sys_rst_n)
             flag_digit1 <= 1'b1;
         end else flag_digit1 <= 1'b0;
     end
+end
     
 assign pix_data = (finish == 1'b1 )?
-                  ((flag_over  == 1'b1)? color_filter3 :                        //gameover
-                  (flag_digit2 == 1'b1)? dout2 :                                //digti2
-                  (flag_digit1 == 1'b1)? dout1 :                                //digti1
-                  (flag_tail1  == 1'b1)? doutc :                                //tail1
-                  (flag_head1  == 1'b1)? doutd :                                //head1
-                  (flag_tail2  == 1'b1)? doutc :                                //tail2
-                  (flag_head2  == 1'b1)? doutd :                                //head2
-                  (flag_bird   == 1'b1)? ((counter <= 7)? color_filter1 : color_filter2):  //bird
-                  (flag_back   == 1'b1)? doutb :                                //background
-                  16'h4e19 ) :                                                  //blue_background
-                  ((flag_digit2 == 1'b1)? dout2 :                               //digti2
-                  (flag_digit1 == 1'b1)? dout1 :                                //digti1
-                  (flag_tail2  == 1'b1)? doutc :                                //tail2
-                  (flag_head2  == 1'b1)? doutd :                                //head2
-                  (flag_tail1  == 1'b1)? doutc :                                //tail1
-                  (flag_head1  == 1'b1)? doutd :                                //head1
-                  (flag_bird   == 1'b1)? ((counter <= 7)? color_filter1 : color_filter2):  //bird
-                  (flag_back   == 1'b1)? doutb :                                //background
-                  16'h4e19 );                                                   //blue_background
+                  ((flag_over  == 1'b1) ? color_filter3 :                                    //gameover
+                  (flag_digit2 == 1'b1) ? dout2 :                                            //digti2
+                  (flag_digit1 == 1'b1) ? dout1 :                                            //digti1
+                  (flag_tail1  == 1'b1) ? doutc :                                            //tail1
+                  (flag_head1  == 1'b1) ? doutd :                                            //head1
+                  (flag_tail2  == 1'b1) ? doutc :                                            //tail2
+                  (flag_head2  == 1'b1) ? doutd :                                            //head2
+                  (flag_bird   == 1'b1) ? ((counter <= 7) ? color_filter1 : color_filter2):  //bird
+                  (flag_back   == 1'b1) ? doutb :                                            //background
+                  16'h4e19 ) :                                                               //blue_background
+                  ((flag_digit2 == 1'b1) ? dout2 :                                           //digti2
+                  (flag_digit1 == 1'b1)  ? dout1 :                                           //digti1
+                  (flag_tail2  == 1'b1)  ? doutc :                                           //tail2
+                  (flag_head2  == 1'b1)  ? doutd :                                           //head2
+                  (flag_tail1  == 1'b1)  ? doutc :                                           //tail1
+                  (flag_head1  == 1'b1)  ? doutd :                                           //head1
+                  (flag_bird   == 1'b1)  ? ((counter <= 7) ? color_filter1 : color_filter2): //bird
+                  (flag_back   == 1'b1)  ? doutb :                                           //background
+                  16'h4e19 );                                                                //blue_background
 
 assign addr_head = flag_head2 ? addr_head2 :
                    flag_head1 ? addr_head1 : 0;
@@ -399,7 +407,6 @@ assign douta_down = (sel_in == 2'b01) ? bluedouta_down :
 assign douta_up   = (sel_in == 2'b01) ? bluedouta_up :
                     (sel_in == 2'b10) ? yellowdouta_up :
                     reddouta_up;
-
 /* Database */
 `ifndef QUESTA
    // redbird up

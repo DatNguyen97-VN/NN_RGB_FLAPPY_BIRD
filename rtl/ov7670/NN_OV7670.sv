@@ -31,9 +31,9 @@ module digital_cam_impl(
 	/* Status LEDs */
 	output logic LED_config_finished,              // Indicates when OV7670 camera configuration is done
 	output logic LED_dll_locked,                   // Indicates when the PLL is locked
-	output logic LED_done,                         // Indicates when the video processing is done
+	output logic [1:0] LED_done,                   // Indicates when the video processing is done
 	output int   y_position,                       // centroids of the object follow y-axis
-	output int   x_position                        // centroids of the object follow X-axis
+	output int   x_position                        // centroids of the object follow x-axis
 );
 
 	// Buffer 1 signals for storing video frames
@@ -134,7 +134,7 @@ module digital_cam_impl(
 
 	// Assign status LEDs
 	assign LED_dll_locked = ~btn_RESET;
-	assign LED_done = (state_current == S4_NORMAL_VIDEO_MODE);
+	//assign LED_done = (state_current == S4_NORMAL_VIDEO_MODE);
 
 	// Generate 25 MHz clock from 50 MHz clock
 	always_ff @(posedge clk_50 or negedge btn_RESET) begin : clk_25mhz
@@ -223,6 +223,7 @@ module digital_cam_impl(
         .clk       (clk_25_vga    ),
         .reset_n   (btn_RESET  ),
 		.vsync_in  (ov7670_vsync),
+		.href_in   (ov7670_href),
         .addr_in   (wraddress_buf1_from_ov7670_capture         ),
         .we_in     (wren_buf1_from_ov7670_capture ),
         .r_in      (red        ),
@@ -234,9 +235,9 @@ module digital_cam_impl(
         .g_out     (nn_vga_g   ),
         .b_out     (nn_vga_b   ),
         .clk_o     (           ),
-        .led       (           ),
+        .led       (LED_done   ),
 		.y_position(y_position ),
-		.x_position(x_position )
+		.x_position(x_position)
     );
 
 endmodule

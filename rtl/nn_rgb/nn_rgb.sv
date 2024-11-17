@@ -5,10 +5,11 @@
 
 module nn_rgb (
     /* control signals */
-    input logic clk, // input clock 74.25 MHz, video 720p
+    input logic clk, // input clock 50 MHz, video 480p
     input logic reset_n, // reset (invoked during configuration)
     /* video in */
     input logic vsync_in, // Vertical sync from OV7670 camera
+    input logic href_in, // Horizontal reference signal from OV7670 camera
     input logic [16:0] addr_in, // data address
     input logic we_in, // write enable
     input logic [7:0] r_in, // red component of pixel
@@ -22,7 +23,7 @@ module nn_rgb (
     output logic [7:0] b_out, // blue component of pixel
     /* -- */
     output logic clk_o, // output clock (do not modify)
-    output logic [2:0] led, // not supported by remote lab
+    output logic [1:0] led, // not supported by remote lab
     output int   y_position,
     output int   x_position
 );
@@ -43,25 +44,34 @@ module nn_rgb (
     typedef logic [0:len-3][7:0] y_array_t;
     y_array_t y;
 
+    // normal RGB output
+    logic [23:00] nor_rgb [($size(networkStructure)-1)*4];
+
     // object centroids variable
     int num_pixel; // number of pixel
     int sum_y_axis; // sum possition of pixel at y-axis
-    int sum_x_axis; // sum possition of pixel at x-axis
     int aver_y_axis; // current y-axis of object
-    int aver_x_axis; // current x-axis of object
-    int old_frame_y_axis; // old y-axis of object
+    int sum_x_axis; // sum possition of pixel at y-axis
+    int aver_x_axis; // current y-axis of object
+
+    // delay frame
+    int yFrame_prev [7];
+    int xFrame_prev [7];
+
+    int debounce_jumping_delay;
+    logic jumping;
+    int debounce_backup_delay;
+    logic backup;
 
 	logic vsync_hold; // Holds the last state of the vsync signal for detecting edges
 
     // input FFs for video control
     logic vsync;
+    logic href;
 
-    // y-axis and x-axis value of frame and old-frame
-    int y_frame, y_old_frame;
-    int x_frame, x_old_frame;
-
-    // object up
+    // object up and back
     logic up;
+    logic back;
 
 
     // generate the neural network with the parameters from config.sv
@@ -92,9 +102,11 @@ module nn_rgb (
     ) cu (
         .clk(clk),
         .vsync_i(vsync_in),
+        .href_i(href_in),
         .addr_i(addr_in),
         .we_i(we_in),
         .vsync_o(vsync),
+        .href_o(href),
         .addr_o(addr_out),
         .we_o(we_out)
     );
@@ -106,11 +118,17 @@ module nn_rgb (
         connection[1] <= g_in;
         connection[2] <= b_in;
 
+        nor_rgb[0] <= {r_in, g_in, b_in};
+
         // convert RGB to luminance: Y (5*R + 9*G + 2*B) / 16
         y[0] <= (5*connection[0] + 9*connection[1] + 2*connection[2]) / 16;
         // loop
         for (int i = 1; i <= ($size(networkStructure)-1)*4; i++) begin
             y[i] <= y[i-1];
+        end
+        // delay normal rgb to vga
+        for (int i = 1; i < $size(nor_rgb); i++) begin
+            nor_rgb[i] <= nor_rgb[i-1];
         end
     end : RGB_compute
 
@@ -132,14 +150,14 @@ module nn_rgb (
         g_blue = {1'b0, luminance[7:1]};
         b_blue = {1'b1, luminance[7:1]};
         // gray: use luminance
-        r_gray = luminance;
-        g_gray = luminance;
-        b_gray = luminance;
+        r_gray = nor_rgb[$size(nor_rgb)-1][23:16];
+        g_gray = nor_rgb[$size(nor_rgb)-1][15:08];
+        b_gray = nor_rgb[$size(nor_rgb)-1][07:00];
     end
     
     // RGB output
     always_ff @(posedge clk) begin
-        if (connection[len-1] > 55) begin
+        if (connection[len-1] > 95) begin
             if (connection[len-1] > connection[len-2]) begin
                 // yellow
                 result_r <= r_yellow;
@@ -151,7 +169,7 @@ module nn_rgb (
                 result_g <= g_blue;
                 result_b <= b_blue;
             end
-        end else if (connection[len-2] > 55) begin
+        end else if (connection[len-2] > 95) begin
             // blue
             result_r <= r_blue;
             result_g <= g_blue;
@@ -188,9 +206,9 @@ module nn_rgb (
             sum_y_axis <= 0;
             sum_x_axis <= 0;
         end else begin
-            if (connection[len-1] > 55 || connection[len-2] > 55) begin
-                sum_y_axis <= sum_y_axis + addr_out/159;
-                sum_x_axis <= sum_x_axis + addr_out%159;
+            if (we_out && (connection[len-1] > 95 || connection[len-2] > 95)) begin
+                sum_y_axis <= sum_y_axis + addr_out/160;
+                sum_x_axis <= sum_x_axis + addr_out%160;
                 num_pixel  <= num_pixel + 32'd1;
             end
         end
@@ -210,37 +228,94 @@ module nn_rgb (
     /* ------------------------------------------ */
     /* Check y-axis value of frame and old-Frame  */
     /* ------------------------------------------ */
-    always_ff @(posedge clk or negedge reset_n) begin : get_y_axis_frame
+    always_ff @(posedge clk or negedge reset_n) begin : get_axis_frame
         if (!reset_n) begin
-            y_frame     <= 0;
-            y_old_frame <= 0;
-            x_frame     <= 0;
-            x_old_frame <= 0;
+            yFrame_prev <= '{default: 0};
+            xFrame_prev <= '{default: 0};
         end else if (!vsync_hold && vsync) begin // check new frame
-            y_frame     <= aver_y_axis;
-            y_old_frame <= y_frame;
-            x_frame     <= aver_x_axis;
-            x_old_frame <= x_frame;
+            // first value of array is current input
+            yFrame_prev[0] <= aver_y_axis;
+            xFrame_prev[0] <= aver_x_axis;
+            // the delay state
+            for (int i = 1; i < $size(yFrame_prev); i++) begin
+                yFrame_prev[i] <= yFrame_prev[i-1];
+            end
+            //
+            for (int i = 1; i < $size(xFrame_prev); i++) begin
+                xFrame_prev[i] <= xFrame_prev[i-1];
+            end
         end
-    end
+    end : get_axis_frame
 
-    always_ff @( posedge clk ) begin : check_frame_and_old_frame
-        if (y_frame && y_old_frame && // both it is zero when start system
-            !vsync_hold && vsync && // check at first line of third-frame
-           (y_frame > y_old_frame)) begin // check increate y-axis value
+    always_ff @( posedge clk or negedge reset_n) begin : check_yAxis   
+        if (!reset_n) begin
+            up <= 1'b0;
+        end else if (yFrame_prev[0] && yFrame_prev[$size(yFrame_prev)-1] && // both it is zero when start system
+                     !vsync_hold && vsync && // check at first line of third-frame
+                    (yFrame_prev[0] + 13 < yFrame_prev[$size(yFrame_prev)-1])) begin // check increate y-axis value
             up <= 1'b1;
         end else begin
             up <= 1'b0;  
         end
-    end
+    end : check_yAxis
 
-    /* -------------------------------------------------- */
-    /* Maintain turn-up signal during on 10 milion cycles */
-    /* -------------------------------------------------- */
+    always_ff @( posedge clk or negedge reset_n) begin : check_xAxis   
+        if (!reset_n) begin
+            back <= 1'b0;
+        end else if (yFrame_prev[0] && yFrame_prev[$size(xFrame_prev)-1] && // both it is zero when start system
+                     !vsync_hold && vsync && // check at first line of third-frame
+                    (xFrame_prev[0] > xFrame_prev[$size(xFrame_prev)-1] + 15)) begin // check increate y-axis value
+            back <= 1'b1;
+        end else begin
+            back <= 1'b0;  
+        end
+    end : check_xAxis
+
+    /* ------------------------------------------------- */
+    /* Maintain jumping signal during on 25 milliseconds */
+    /* ------------------------------------------------- */
+    always_ff @( posedge clk or negedge reset_n ) begin : gen_jumping
+        if (!reset_n) begin
+            debounce_jumping_delay <= 0;
+            jumping <= 1'b0;
+        end else begin
+            if (!debounce_jumping_delay) begin
+                if (up) begin
+                    debounce_jumping_delay <= 1249999;
+                    jumping <= 1'b1;
+                end else begin           
+                    jumping <= 1'b0;
+                end
+            end else begin
+                debounce_jumping_delay <=  debounce_jumping_delay - 1;
+            end
+        end
+    end : gen_jumping
+
+    /* ------------------------------------------------ */
+    /* Maintain backup signal during on 25 milliseconds */
+    /* ------------------------------------------------ */
+    always_ff @( posedge clk or negedge reset_n ) begin : gen_backup
+        if (!reset_n) begin
+            debounce_backup_delay <= 0;
+            backup <= 1'b0;
+        end else begin
+            if (!debounce_backup_delay) begin
+                if (back) begin
+                    debounce_backup_delay <= 1249999;
+                    backup <= 1'b1;
+                end else begin           
+                    backup <= 1'b0;
+                end
+            end else begin
+                debounce_backup_delay <=  debounce_backup_delay - 1;
+            end
+        end
+    end : gen_backup
 
     assign clk_o = clk;
-    assign led = 3'b000;
-    assign y_position = y_frame;
-    assign x_position = x_frame;
+    assign led = backup ? 2'b10 : jumping ? 2'b01 : 2'b00;
+    assign y_position = yFrame_prev[0];
+    assign x_position = xFrame_prev[0] + 3; // add a bias of Horizontal
     
 endmodule

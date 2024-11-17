@@ -1,18 +1,16 @@
-
-
 module  vga_ctrl
 (
-    input   wire            vga_clk     ,   // Input working clock, frequency 25MHz
-    input   wire            sys_rst_n   ,   // Input reset signal, low level is effective
-    input   wire    [15:0]  pix_data    ,   // Input pixel color information
+    input   logic        vga_clk    , // Input working clock, frequency 25MHz
+    input   logic        sys_rst_n  , // Input reset signal, low level is effective
+    input   logic [15:0] pix_data   , // Input pixel color information
 
-    output  wire    [09:0]  pix_x       ,   // Output the X-axis coordinates of the pixels in the effective VGA display area
-    output  wire    [09:0]  pix_y       ,   // Output the Y-axis coordinate of the pixel point in the VGA effective display area
-    output  reg             hsync       ,   // Output line synchronization signal
-    output  reg             vsync       ,   // Output field sync signal
-    output  wire            rgb_valid   ,
-	output  reg             activeArea  ,
-    output  wire    [15:0]  rgb             // Output pixel color information
+    output  logic [09:0] pix_x      , // Output the X-axis coordinates of the pixels in the effective VGA display area
+    output  logic [09:0] pix_y      , // Output the Y-axis coordinate of the pixel point in the VGA effective display area
+    output  logic        hsync      , // Output line synchronization signal
+    output  logic        vsync      , // Output field sync signal
+    output  logic        rgb_valid  ,
+	output  logic        activeArea ,
+    output  logic [15:0] rgb          // Output pixel color information
 );
 
 //********************************************************************//
@@ -23,17 +21,17 @@ logic [09:00] Hcnt; // Line sync signal counter
 logic [09:00] Vcnt; // Field sync signal counter
 
 //parameter define
-const int H_TOTAL = 799;   // the maximum size considers 800 (horizontal)
+const int H_TOTAL   = 799; // the maximum size considers 800 (horizontal)
 const int H_DISPLAY = 640; // screen size (horizontal)
-const int H_FRONT = 16;    // front porch
-const int H_BACK = 48;     // back porch
-const int H_SYNC = 96;     // sync time
+const int H_FRONT   = 16;  // front porch
+const int H_BACK    = 48;  // back porch
+const int H_SYNC    = 96;  // sync time
 
-const int V_TOTAL = 524;   // the maximum size considers 525 (vertical) 
+const int V_TOTAL   = 524; // the maximum size considers 525 (vertical) 
 const int V_DISPLAY = 480; // screen size (vertical)
-const int V_FRONT = 10;    // front porch
-const int V_BACK = 33;     // back porch
-const int VR = 2;          // retrace
+const int V_FRONT   = 10;  // front porch
+const int V_BACK    = 33;  // back porch
+const int VR        = 2;   // retrace
 
 //********************************************************************//
 //***************************** Main Code ****************************//
