@@ -4,7 +4,8 @@
 3. [NN RGB](#3-NN-RGB)
 4. [Flappy Bird](#4-Flappy-Bird)
 5. [Additional Features in The Future](#5-Additional-Features-in-The-Future)
-6. [References](#6-References)
+6. [Getting Started](#6-Getting-Started)
+7. [References](#6-References)
 
 ## 1. Overview
 This is a hand-motion controlled Flappy Bird game where the player controls the bird's movement to avoid pipes, with points awarded for passing through gaps, and the game ending if the bird collides with a pipe. The game is displayed on a VGA screen.
@@ -51,6 +52,32 @@ The game can also have a win condition based on a preset score (e.g., 5 points),
 ## 5. Additional Features in The Future
 **A low-pass filter** is used to process noise from the camera, as the current noise affects the NN RGB, causing errors in the centroid calculation of the hand.  
 
+## 6. Getting Started
+
+This setup provides a very simple script-based "demo setup" that allows to check out this project on the DE2-115 board.  
+
+ + FPGA Board: 📚 DE2-115 FPGA Board
+ + FPGA: `Intel Cyclone-IV EP4CE115F29C7`
+ + Toolchain: Intel Quartus Prime (tested with Quartus Prime 21.1.1 Lite Edition - Lite Edition)  
+
+ **Configuration**
+ + Clock: 50MHz from on-board oscillator
+ + Reset: via on-board button "KEY0"
+ + Re-start: via on-board button "KEY1"
+ + Bird selection: via on-board button "SW2" and "SW3
+ + Start game: via on-board button "SW1"
+
+ **How To Run**
+The `create_project.tcl` TCL script in this directory can be used to create a complete Quartus project.  
+
+ 1. start Quartus (in GUI mode)
+ 2. in the menu line click "View/Utility Windows/Tcl console" to open the Tcl console
+ 3. use the console to naviagte to this folder: `cd NN_RGB_FLAPPY_BIRD/boards/de2-115`
+ 4. execute `source create_project.tcl` - this will create and open the actual Quartus project in this folder
+ 5. if a "select family" prompt appears select the "Cyclone IV E" family and click OK
+ 6. double click on "Compile Design" in the "Tasks" window. This will synthesize, map and place & route your design and will also generate the actual FPGA bitstream
+    when the process is done open the programmer (for example via "Tools/Programmer") and click "Start" in the programmer window to upload the bitstream to your FPGA.
+    
 ## 6. References  
 1. FPGA4student, Basys 3 FPGA OV7670 Camera, https://www.fpga4student.com/2018/08/basys-3-fpga-ov7670-camera.html  
 2. Mr. Marco Winzker, FPGA Design of a Neural Network for Color Detection, https://github.com/Marco-Winzker/NN_RGB_FPGA
