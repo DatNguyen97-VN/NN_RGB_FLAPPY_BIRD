@@ -1,14 +1,15 @@
 # A neural network of color detection for the flappy bird game
 1. [Overview](#1-Overview)
 2. [Ov7670](#2-Ov7670)
-3. [NN-RGB](#3-NN-RGB)
+3. [NN RGB](#3-NN-RGB)
 4. [Flappy Bird](#4-Flappy-Bird)
-5. [Addtional Features in The Future](#6-Addtional-Features-in-The-Future)
-6. [Prolems](#7-Prolems)
-7. [References](#8-References)
+5. [Additional Features in The Future](#5-Additional-Features-in-The-Future)
+6. [References](#6-References)
 
 ## 1. Overview
 This is a hand-motion controlled Flappy Bird game where the player controls the bird's movement to avoid pipes, with points awarded for passing through gaps, and the game ending if the bird collides with a pipe. The game is displayed on a VGA screen.
+
+https://github.com/user-attachments/assets/54c3d70f-76f3-4b28-b0e2-4ba5253c06c7
 
 The idea is to design three main modules: OV7670, NN RGB, and Flappy Bird. The OV7670 module is responsible for gives data from the OV7670 camera, the NN RGB module is a neural network responsible for detecting skin color within a frame, then calculating the centroid of the hand and detecting whether the hand is moving vertically or horizontally. Finally, the Flappy Bird module creates the game logic and displays it on the VGA screen rely on the hand movement.
 
@@ -17,8 +18,18 @@ This module will process data from the camera in two steps:
 + The first step sends the configuration set by the user to the camera via SCCB Interface, it is compatible with the I2C protocol.
 + The second step gets valid data based on the VGA frame timing and Horizontal timing.  
 
-## 3. NN RGB
-This module uses a neural network with 3 input nodes, 1 hidden layer with 7 nodes, and 2 output nodes. The input values will be the RGB values of each pixel, which will pass through a linear function to extract simple features. These will then pass through a nonlinear function (sigmoid) to extract more complex features. Finally, the output layer will determine whether the pixel is skin color or not.  
+## 3. NN RGB 
+Here’s a summary of the operation of the neural network with 3 input nodes (RGB), 1 hidden layer with 7 nodes, and 2 output nodes: 
+
+**Input Layer:** The network receives 3 input values, which are the RGB values of a pixel. Each value represents the intensity of red, green, and blue in the pixel.  
+
+**Hidden Layer:** The input values are passed through the first layer (hidden layer) with 7 nodes. Each input is multiplied by weights, and the result is passed through a linear activation function to extract simple features from the data.  
+
+**Nonlinear Activation:** The output from the hidden layer is then passed through a nonlinear activation function, such as a sigmoid function, to extract more complex features and introduce non-linearity into the model.  
+
+**Output Layer:** The network has 2 output nodes. Based on the learned weights and the computed features, the network decides whether the pixel is skin color or not. Each output corresponds to a binary classification of skin or non-skin.  
+
+This structure allows the network to learn the pattern of skin color in the image and classify each pixel accordingly.  
 
 ## 4. Flappy Bird
 Here’s a summary of the mechanism of the Flappy Bird Logic:  
@@ -37,17 +48,10 @@ The game can also have a win condition based on a preset score (e.g., 5 points),
 
 **Display:** The game is displayed on a VGA screen, with the bird, pipes, and score rendered based on hand movements.  
 
-## 5. Addtional Features in The Future
+## 5. Additional Features in The Future
 **A low-pass filter** is used to process noise from the camera, as the current noise affects the NN RGB, causing errors in the centroid calculation of the hand.  
 
-## 6. Problems  
-During the production of this project, I encountered many problems, and in the end, there are a few key issues as follows:  
-
-**P1:** The image quality from the camera was not as expected. To address this, I applied additional filters in the camera, but another issue occurs: the camera can not be used at night :joy::joy:.  
-
-**P2:** 
-
-## 7. References  
+## 6. References  
 1. FPGA4student, Basys 3 FPGA OV7670 Camera, https://www.fpga4student.com/2018/08/basys-3-fpga-ov7670-camera.html  
 2. Mr. Marco Winzker, FPGA Design of a Neural Network for Color Detection, https://github.com/Marco-Winzker/NN_RGB_FPGA
 3. The Flappy Bird Game, https://github.com/kiterunner347/flappy_bird  
