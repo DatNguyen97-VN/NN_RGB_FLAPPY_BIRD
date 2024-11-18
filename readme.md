@@ -67,7 +67,8 @@ This setup provides a very simple script-based "demo setup" that allows to check
  + Bird selection: via on-board button "SW2" and "SW3
  + Start game: via on-board button "SW1"
 
- **How To Run**
+ **How To Run**   
+ 
 The `create_project.tcl` TCL script in this directory can be used to create a complete Quartus project.  
 
  1. start Quartus (in GUI mode)
